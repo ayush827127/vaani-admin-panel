@@ -5,6 +5,7 @@ const navItems = [
   { to: '/shops', label: 'Shops' },
   { to: '/plans', label: 'Plans' },
   { to: '/modules', label: 'Modules' },
+  { to: '/payment-claims', label: 'Payment Claims' },
 ];
 
 export default function AppLayout() {

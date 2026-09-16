@@ -6,6 +6,7 @@ import ShopsListPage from './pages/ShopsListPage';
 import ShopDetailPage from './pages/ShopDetailPage';
 import PlansPage from './pages/PlansPage';
 import ModulesPage from './pages/ModulesPage';
+import PaymentClaimsPage from './pages/PaymentClaimsPage';
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="/shops/:shopId" element={<ShopDetailPage />} />
           <Route path="/plans" element={<PlansPage />} />
           <Route path="/modules" element={<ModulesPage />} />
+          <Route path="/payment-claims" element={<PaymentClaimsPage />} />
         </Route>
       </Route>
 
