@@ -1,17 +1,22 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import * as plansApi from '../api/plans';
 import * as modulesApi from '../api/modules';
 import Modal from '../components/Modal';
 import Field from '../components/Field';
 import ModuleCheckboxGrid from '../components/ModuleCheckboxGrid';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useToast } from '../components/ToastContext';
 
 const BILLING_CYCLES = ['MONTHLY', 'YEARLY'];
 
 export default function PlansPage() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [editingPlan, setEditingPlan] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [deactivatingPlan, setDeactivatingPlan] = useState(null);
 
   const plansQuery = useQuery({ queryKey: ['plans'], queryFn: plansApi.listPlans });
   const modulesQuery = useQuery({ queryKey: ['modules'], queryFn: modulesApi.listModules });
@@ -19,16 +24,23 @@ export default function PlansPage() {
   const saveMutation = useMutation({
     mutationFn: ({ id, data }) =>
       id ? plansApi.updatePlan(id, data) : plansApi.createPlan(data),
-    onSuccess: () => {
+    onSuccess: (plan) => {
       queryClient.invalidateQueries({ queryKey: ['plans'] });
       setShowForm(false);
       setEditingPlan(null);
+      toast.success(`${plan.name} saved`);
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const deactivateMutation = useMutation({
     mutationFn: plansApi.deletePlan,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plans'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['plans'] });
+      toast.success(`${deactivatingPlan?.name} deactivated`);
+      setDeactivatingPlan(null);
+    },
+    onError: (err) => toast.error(err.message),
   });
 
   function openCreate() {
@@ -47,8 +59,9 @@ export default function PlansPage() {
         <h1 className="text-xl font-semibold text-gray-900">Plans</h1>
         <button
           onClick={openCreate}
-          className="rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
+          className="flex items-center gap-1.5 rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
         >
+          <Plus size={15} />
           New plan
         </button>
       </div>
@@ -87,7 +100,7 @@ export default function PlansPage() {
               </button>
               {plan.isActive && (
                 <button
-                  onClick={() => deactivateMutation.mutate(plan.id)}
+                  onClick={() => setDeactivatingPlan(plan)}
                   className="text-red-600 hover:underline"
                 >
                   Deactivate
@@ -106,6 +119,18 @@ export default function PlansPage() {
           onSubmit={(data) => saveMutation.mutate({ id: editingPlan?.id, data })}
           submitting={saveMutation.isPending}
           error={saveMutation.error}
+        />
+      )}
+
+      {deactivatingPlan && (
+        <ConfirmDialog
+          title="Deactivate this plan?"
+          message={`${deactivatingPlan.name} will no longer be offered to new subscribers. Shops already on it keep their access until you change it.`}
+          confirmLabel="Deactivate"
+          tone="danger"
+          busy={deactivateMutation.isPending}
+          onConfirm={() => deactivateMutation.mutate(deactivatingPlan.id)}
+          onClose={() => setDeactivatingPlan(null)}
         />
       )}
     </div>

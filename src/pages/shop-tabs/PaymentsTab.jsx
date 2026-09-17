@@ -6,12 +6,14 @@ import Modal from '../../components/Modal';
 import Field from '../../components/Field';
 import SearchBar from '../../components/SearchBar';
 import Pagination from '../../components/Pagination';
+import { useToast } from '../../components/ToastContext';
 
 const LIMIT = 20;
 const PAYMENT_TYPES = ['bill_payment', 'advance_used', 'outstanding_collection', 'advance_deposit'];
 
 export default function PaymentsTab({ shopId }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalPayment, setModalPayment] = useState(null);
@@ -31,10 +33,12 @@ export default function PaymentsTab({ shopId }) {
   const saveMutation = useMutation({
     mutationFn: ({ id, data }) =>
       id ? paymentsApi.updatePayment(shopId, id, data) : paymentsApi.createPayment(shopId, data),
-    onSuccess: () => {
+    onSuccess: (_, { id }) => {
       invalidate();
       setModalPayment(null);
+      toast.success(id ? 'Payment updated' : 'Payment recorded');
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const deleteMutation = useMutation({
@@ -42,7 +46,9 @@ export default function PaymentsTab({ shopId }) {
     onSuccess: () => {
       invalidate();
       setConfirmDeleteId(null);
+      toast.success('Payment deleted');
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const customerName = (localCustomerId) =>

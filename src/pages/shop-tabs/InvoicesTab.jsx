@@ -8,6 +8,7 @@ import Field from '../../components/Field';
 import SearchBar from '../../components/SearchBar';
 import Pagination from '../../components/Pagination';
 import StatusBadge from '../../components/StatusBadge';
+import { useToast } from '../../components/ToastContext';
 
 const LIMIT = 20;
 const DISCOUNT_TYPES = ['none', 'percent', 'flat'];
@@ -15,6 +16,7 @@ const STATUSES = ['paid', 'partial_paid', 'pending', 'cancelled'];
 
 export default function InvoicesTab({ shopId }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
@@ -39,7 +41,9 @@ export default function InvoicesTab({ shopId }) {
     onSuccess: () => {
       invalidate();
       setShowCreate(false);
+      toast.success('Invoice created');
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const updateMutation = useMutation({
@@ -47,7 +51,9 @@ export default function InvoicesTab({ shopId }) {
     onSuccess: () => {
       invalidate();
       setEditingId(null);
+      toast.success('Invoice updated');
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const deleteMutation = useMutation({
@@ -55,7 +61,9 @@ export default function InvoicesTab({ shopId }) {
     onSuccess: () => {
       invalidate();
       setConfirmDeleteId(null);
+      toast.success('Invoice deleted');
     },
+    onError: (err) => toast.error(err.message),
   });
 
   return (

@@ -4,14 +4,18 @@ import * as claimsApi from '../api/paymentClaims';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import StatusBadge from '../components/StatusBadge';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useToast } from '../components/ToastContext';
 
 const LIMIT = 20;
 const TABS = ['PENDING', 'CONFIRMED', 'REJECTED', 'ALL'];
 
 export default function PaymentClaimsPage() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [tab, setTab] = useState('PENDING');
   const [page, setPage] = useState(1);
+  const [confirmingClaim, setConfirmingClaim] = useState(null);
   const [rejectingClaim, setRejectingClaim] = useState(null);
 
   const query = useQuery({
@@ -23,7 +27,12 @@ export default function PaymentClaimsPage() {
 
   const confirmMutation = useMutation({
     mutationFn: claimsApi.confirmPaymentClaim,
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      setConfirmingClaim(null);
+      toast.success(`Payment confirmed — ${confirmingClaim?.shop.name} moved to ${confirmingClaim?.plan.name}`);
+    },
+    onError: (err) => toast.error(err.message),
   });
 
   const rejectMutation = useMutation({
@@ -31,7 +40,9 @@ export default function PaymentClaimsPage() {
     onSuccess: () => {
       invalidate();
       setRejectingClaim(null);
+      toast.success('Claim rejected');
     },
+    onError: (err) => toast.error(err.message),
   });
 
   function switchTab(t) {
@@ -101,9 +112,8 @@ export default function PaymentClaimsPage() {
                     {c.status === 'PENDING' && (
                       <div className="flex justify-end gap-3">
                         <button
-                          onClick={() => confirmMutation.mutate(c.id)}
-                          disabled={confirmMutation.isPending}
-                          className="text-green-700 hover:underline disabled:opacity-50"
+                          onClick={() => setConfirmingClaim(c)}
+                          className="text-green-700 hover:underline"
                         >
                           Confirm
                         </button>
@@ -134,8 +144,16 @@ export default function PaymentClaimsPage() {
         </div>
       )}
 
-      {confirmMutation.error && (
-        <p className="mt-3 text-sm text-red-600">{confirmMutation.error.message}</p>
+      {confirmingClaim && (
+        <ConfirmDialog
+          title="Confirm this payment?"
+          message={`This activates the ${confirmingClaim.plan.name} plan (₹${confirmingClaim.amount}) for ${confirmingClaim.shop.name} immediately. Only confirm after verifying the UPI credit (ref ${confirmingClaim.reference}) actually arrived in your account.`}
+          confirmLabel="Yes, payment received"
+          tone="primary"
+          busy={confirmMutation.isPending}
+          onConfirm={() => confirmMutation.mutate(confirmingClaim.id)}
+          onClose={() => setConfirmingClaim(null)}
+        />
       )}
 
       {rejectingClaim && (

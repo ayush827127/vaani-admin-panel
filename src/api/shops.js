@@ -1,10 +1,11 @@
 import { request } from './client';
 
-export function listShops({ page, limit, status } = {}) {
+export function listShops({ page, limit, status, search } = {}) {
   const params = new URLSearchParams();
   if (page) params.set('page', page);
   if (limit) params.set('limit', limit);
   if (status) params.set('status', status);
+  if (search) params.set('search', search);
   const qs = params.toString();
   return request(`/api/admin/shops${qs ? `?${qs}` : ''}`);
 }
@@ -30,6 +31,10 @@ export function setModuleOverride(shopId, moduleId, enabled) {
     method: 'PATCH',
     body: { enabled },
   });
+}
+
+export function removeModuleOverride(shopId, moduleId) {
+  return request(`/api/admin/shops/${shopId}/modules/${moduleId}`, { method: 'DELETE' });
 }
 
 export function uploadShopLogo(shopId, file) {

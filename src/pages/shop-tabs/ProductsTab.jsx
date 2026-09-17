@@ -5,11 +5,13 @@ import Modal from '../../components/Modal';
 import Field from '../../components/Field';
 import SearchBar from '../../components/SearchBar';
 import Pagination from '../../components/Pagination';
+import { useToast } from '../../components/ToastContext';
 
 const LIMIT = 20;
 
 export default function ProductsTab({ shopId }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalProduct, setModalProduct] = useState(null); // null = closed, {} = create, {...} = edit
@@ -25,10 +27,12 @@ export default function ProductsTab({ shopId }) {
   const saveMutation = useMutation({
     mutationFn: ({ id, data }) =>
       id ? productsApi.updateProduct(shopId, id, data) : productsApi.createProduct(shopId, data),
-    onSuccess: () => {
+    onSuccess: (_, { id }) => {
       invalidate();
       setModalProduct(null);
+      toast.success(id ? 'Product updated' : 'Product created');
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const deleteMutation = useMutation({
@@ -36,7 +40,9 @@ export default function ProductsTab({ shopId }) {
     onSuccess: () => {
       invalidate();
       setConfirmDeleteId(null);
+      toast.success('Product deleted');
     },
+    onError: (err) => toast.error(err.message),
   });
 
   return (

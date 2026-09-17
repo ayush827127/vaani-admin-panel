@@ -16,7 +16,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate('/shops', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {

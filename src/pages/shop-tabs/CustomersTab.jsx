@@ -5,11 +5,13 @@ import Modal from '../../components/Modal';
 import Field from '../../components/Field';
 import SearchBar from '../../components/SearchBar';
 import Pagination from '../../components/Pagination';
+import { useToast } from '../../components/ToastContext';
 
 const LIMIT = 20;
 
 export default function CustomersTab({ shopId }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalCustomer, setModalCustomer] = useState(null);
@@ -25,10 +27,12 @@ export default function CustomersTab({ shopId }) {
   const saveMutation = useMutation({
     mutationFn: ({ id, data }) =>
       id ? customersApi.updateCustomer(shopId, id, data) : customersApi.createCustomer(shopId, data),
-    onSuccess: () => {
+    onSuccess: (_, { id }) => {
       invalidate();
       setModalCustomer(null);
+      toast.success(id ? 'Customer updated' : 'Customer created');
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const deleteMutation = useMutation({
@@ -36,7 +40,9 @@ export default function CustomersTab({ shopId }) {
     onSuccess: () => {
       invalidate();
       setConfirmDeleteId(null);
+      toast.success('Customer deleted');
     },
+    onError: (err) => toast.error(err.message),
   });
 
   return (

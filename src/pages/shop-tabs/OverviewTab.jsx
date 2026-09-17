@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, Pencil } from 'lucide-react';
 import * as shopsApi from '../../api/shops';
 import * as plansApi from '../../api/plans';
 import * as subscriptionsApi from '../../api/subscriptions';
 import * as shopUsersApi from '../../api/shopUsers';
 import StatusBadge from '../../components/StatusBadge';
 import Field from '../../components/Field';
+import Select from '../../components/Select';
+import Modal from '../../components/Modal';
+import { useToast } from '../../components/ToastContext';
 
 const SUBSCRIPTION_STATUS_OPTIONS = ['TRIAL', 'ACTIVE', 'EXPIRED', 'CANCELLED'];
 const SHOP_USER_ROLES = ['OWNER', 'MANAGER', 'CASHIER'];
@@ -22,9 +26,15 @@ export default function OverviewTab({ shopId, shop, modules }) {
 
 // ── Subscriptions ────────────────────────────────────────────────────────────
 
+function dateInputValue(d) {
+  return d ? new Date(d).toISOString().slice(0, 10) : '';
+}
+
 function SubscriptionsSection({ shopId }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [showAssign, setShowAssign] = useState(false);
+  const [editingSub, setEditingSub] = useState(null);
 
   const subsQuery = useQuery({
     queryKey: ['subscriptions', shopId],
@@ -32,18 +42,30 @@ function SubscriptionsSection({ shopId }) {
   });
   const plansQuery = useQuery({ queryKey: ['plans'], queryFn: plansApi.listPlans });
 
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['subscriptions', shopId] });
+    queryClient.invalidateQueries({ queryKey: ['shop', shopId] });
+    queryClient.invalidateQueries({ queryKey: ['shops'] });
+  };
+
   const createMutation = useMutation({
     mutationFn: subscriptionsApi.createSubscription,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subscriptions', shopId] });
-      queryClient.invalidateQueries({ queryKey: ['shop', shopId] });
+      invalidate();
       setShowAssign(false);
+      toast.success('Subscription assigned');
     },
+    onError: (err) => toast.error(err.message),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => subscriptionsApi.updateSubscription(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions', shopId] }),
+    onSuccess: () => {
+      invalidate();
+      setEditingSub(null);
+      toast.success('Subscription updated');
+    },
+    onError: (err) => toast.error(err.message),
   });
 
   return (
@@ -52,8 +74,9 @@ function SubscriptionsSection({ shopId }) {
         <h2 className="text-sm font-semibold text-gray-900">Subscriptions</h2>
         <button
           onClick={() => setShowAssign((v) => !v)}
-          className="rounded-md bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
+          className="flex items-center gap-1 rounded-md bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
         >
+          <Plus size={13} />
           Assign subscription
         </button>
       </div>
@@ -76,32 +99,36 @@ function SubscriptionsSection({ shopId }) {
               <span className="text-gray-500">
                 · started {new Date(sub.startDate).toLocaleDateString()}
                 {sub.endDate ? ` · ends ${new Date(sub.endDate).toLocaleDateString()}` : ''}
+                {sub.autoRenew ? ' · auto-renews' : ''}
               </span>
             </div>
             <div className="flex items-center gap-2">
               <StatusBadge status={sub.status} />
-              <select
-                value=""
-                onChange={(e) =>
-                  e.target.value &&
-                  updateMutation.mutate({ id: sub.id, data: { status: e.target.value } })
-                }
-                className="rounded-md border border-gray-300 px-2 py-1 text-xs"
+              <button
+                onClick={() => setEditingSub(sub)}
+                title="Edit subscription"
+                className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               >
-                <option value="">Change…</option>
-                {SUBSCRIPTION_STATUS_OPTIONS.filter((s) => s !== sub.status).map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+                <Pencil size={13} />
+              </button>
             </div>
           </div>
         ))}
         {subsQuery.data?.length === 0 && (
-          <p className="py-2 text-sm text-gray-400">No subscriptions yet.</p>
+          <p className="py-2 text-sm text-gray-400">No subscriptions yet — this shop is on the free Basic plan.</p>
         )}
       </div>
+
+      {editingSub && plansQuery.data && (
+        <EditSubscriptionModal
+          subscription={editingSub}
+          plans={plansQuery.data}
+          onClose={() => setEditingSub(null)}
+          onSubmit={(data) => updateMutation.mutate({ id: editingSub.id, data })}
+          submitting={updateMutation.isPending}
+          error={updateMutation.error}
+        />
+      )}
     </div>
   );
 }
@@ -109,47 +136,40 @@ function SubscriptionsSection({ shopId }) {
 function AssignSubscriptionForm({ shopId, plans, onSubmit, submitting, error }) {
   const [planId, setPlanId] = useState(plans[0]?.id ?? '');
   const [status, setStatus] = useState('ACTIVE');
+  const [endDate, setEndDate] = useState('');
 
   function handleSubmit(e) {
     e.preventDefault();
-    onSubmit({ shopId, planId, status });
+    onSubmit({ shopId, planId, status, endDate: endDate || undefined });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mb-4 flex items-end gap-3 rounded-md bg-gray-50 p-3">
-      {error && <p className="text-sm text-red-600">{error.message}</p>}
-      <label className="block">
-        <span className="mb-1 block text-xs font-medium text-gray-700">Plan</span>
-        <select
-          value={planId}
-          onChange={(e) => setPlanId(e.target.value)}
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-        >
-          {plans.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="block">
-        <span className="mb-1 block text-xs font-medium text-gray-700">Status</span>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-        >
-          {SUBSCRIPTION_STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </label>
+    <form onSubmit={handleSubmit} className="mb-4 flex flex-wrap items-end gap-3 rounded-md bg-gray-50 p-3">
+      {error && <p className="w-full text-sm text-red-600">{error.message}</p>}
+      <Select label="Plan" value={planId} onChange={(e) => setPlanId(e.target.value)}>
+        {plans.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name} · ₹{p.price}
+          </option>
+        ))}
+      </Select>
+      <Select label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+        {SUBSCRIPTION_STATUS_OPTIONS.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </Select>
+      <Field
+        label="Ends (optional)"
+        type="date"
+        value={endDate}
+        onChange={(e) => setEndDate(e.target.value)}
+      />
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+        className="rounded-md bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
       >
         {submitting ? 'Assigning…' : 'Assign'}
       </button>
@@ -157,13 +177,81 @@ function AssignSubscriptionForm({ shopId, plans, onSubmit, submitting, error }) 
   );
 }
 
+function EditSubscriptionModal({ subscription, plans, onClose, onSubmit, submitting, error }) {
+  const [planId, setPlanId] = useState(subscription.planId);
+  const [status, setStatus] = useState(subscription.status);
+  const [startDate, setStartDate] = useState(dateInputValue(subscription.startDate));
+  const [endDate, setEndDate] = useState(dateInputValue(subscription.endDate));
+  const [autoRenew, setAutoRenew] = useState(subscription.autoRenew ?? false);
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    onSubmit({
+      planId,
+      status,
+      startDate: startDate || undefined,
+      endDate: endDate || null,
+      autoRenew,
+    });
+  }
+
+  return (
+    <Modal title={`Edit ${subscription.plan.name} subscription`} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {error && (
+          <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error.message}</div>
+        )}
+        <Select label="Plan" value={planId} onChange={(e) => setPlanId(e.target.value)}>
+          {plans.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} · ₹{p.price}
+            </option>
+          ))}
+        </Select>
+        <Select label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+          {SUBSCRIPTION_STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </Select>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Start date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <Field label="End date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </div>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={autoRenew}
+            onChange={(e) => setAutoRenew(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+          />
+          Auto-renew
+        </label>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+        >
+          {submitting ? 'Saving…' : 'Save changes'}
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
 // ── Module overrides ─────────────────────────────────────────────────────────
 
 function ModuleOverridesSection({ shopId, modules, overrides }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const overrideMutation = useMutation({
-    mutationFn: ({ moduleId, enabled }) => shopsApi.setModuleOverride(shopId, moduleId, enabled),
+    mutationFn: ({ moduleId, enabled }) =>
+      enabled === null
+        ? shopsApi.removeModuleOverride(shopId, moduleId)
+        : shopsApi.setModuleOverride(shopId, moduleId, enabled),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['shop', shopId] }),
+    onError: (err) => toast.error(err.message),
   });
 
   const overrideByModuleId = Object.fromEntries(overrides.map((o) => [o.moduleId, o]));
@@ -172,30 +260,34 @@ function ModuleOverridesSection({ shopId, modules, overrides }) {
     <div className="rounded-lg border border-gray-200 bg-white p-5">
       <h2 className="mb-1 text-sm font-semibold text-gray-900">Module overrides</h2>
       <p className="mb-3 text-xs text-gray-500">
-        Grant or revoke a module for this shop regardless of its plan.
+        Grant or revoke a module for this shop regardless of its plan. "Following plan" means the shop's plan decides.
       </p>
       <div className="divide-y divide-gray-100">
         {modules.map((m) => {
           const override = overrideByModuleId[m.id];
+          const state = override ? (override.enabled ? 'granted' : 'revoked') : 'plan';
           return (
-            <div key={m.id} className="flex items-center justify-between py-2 text-sm">
+            <div key={m.id} className="flex items-center justify-between py-2.5 text-sm">
               <span className="text-gray-800">{m.name}</span>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400">
-                  {override ? (override.enabled ? 'Override: granted' : 'Override: revoked') : 'Following plan'}
-                </span>
-                <button
+              <div className="flex items-center gap-1 rounded-md border border-gray-200 p-0.5">
+                <OverrideOption
+                  active={state === 'granted'}
+                  label="Grant"
+                  activeClasses="bg-emerald-100 text-emerald-700"
                   onClick={() => overrideMutation.mutate({ moduleId: m.id, enabled: true })}
-                  className="rounded-md border border-green-300 px-2 py-1 text-xs text-green-700 hover:bg-green-50"
-                >
-                  Grant
-                </button>
-                <button
+                />
+                <OverrideOption
+                  active={state === 'plan'}
+                  label="Follow plan"
+                  activeClasses="bg-gray-200 text-gray-700"
+                  onClick={() => overrideMutation.mutate({ moduleId: m.id, enabled: null })}
+                />
+                <OverrideOption
+                  active={state === 'revoked'}
+                  label="Revoke"
+                  activeClasses="bg-red-100 text-red-700"
                   onClick={() => overrideMutation.mutate({ moduleId: m.id, enabled: false })}
-                  className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                >
-                  Revoke
-                </button>
+                />
               </div>
             </div>
           );
@@ -205,29 +297,59 @@ function ModuleOverridesSection({ shopId, modules, overrides }) {
   );
 }
 
+function OverrideOption({ active, label, activeClasses, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+        active ? activeClasses : 'text-gray-400 hover:bg-gray-50'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 // ── Shop users ────────────────────────────────────────────────────────────────
 
 function ShopUsersSection({ shopId, modules }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [showAdd, setShowAdd] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
 
   const usersQuery = useQuery({
     queryKey: ['shopUsers', shopId],
     queryFn: () => shopUsersApi.listShopUsers(shopId),
   });
 
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['shopUsers', shopId] });
+
   const createMutation = useMutation({
     mutationFn: (data) => shopUsersApi.createShopUser(shopId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shopUsers', shopId] });
+      invalidate();
       setShowAdd(false);
+      toast.success('Staff member added');
     },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => shopUsersApi.updateShopUser(shopId, id, data),
+    onSuccess: () => {
+      invalidate();
+      setEditingUser(null);
+      toast.success('Staff member updated');
+    },
+    onError: (err) => toast.error(err.message),
   });
 
   const accessMutation = useMutation({
     mutationFn: ({ userId, moduleId, canView, canEdit }) =>
       shopUsersApi.setShopUserAccess(shopId, userId, moduleId, { canView, canEdit }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['shopUsers', shopId] }),
+    onSuccess: invalidate,
+    onError: (err) => toast.error(err.message),
   });
 
   return (
@@ -236,8 +358,9 @@ function ShopUsersSection({ shopId, modules }) {
         <h2 className="text-sm font-semibold text-gray-900">Shop users</h2>
         <button
           onClick={() => setShowAdd((v) => !v)}
-          className="rounded-md bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
+          className="flex items-center gap-1 rounded-md bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
         >
+          <Plus size={13} />
           Add user
         </button>
       </div>
@@ -257,9 +380,18 @@ function ShopUsersSection({ shopId, modules }) {
               <span className="text-sm font-medium text-gray-900">
                 {user.name} <span className="font-normal text-gray-500">· {user.phone}</span>
               </span>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                {user.role}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                  {user.role}
+                </span>
+                <button
+                  onClick={() => setEditingUser(user)}
+                  title="Edit staff member"
+                  className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                >
+                  <Pencil size={13} />
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-1">
               {modules.map((m) => {
@@ -309,6 +441,16 @@ function ShopUsersSection({ shopId, modules }) {
           <p className="text-sm text-gray-400">No staff added yet.</p>
         )}
       </div>
+
+      {editingUser && (
+        <EditShopUserModal
+          user={editingUser}
+          onClose={() => setEditingUser(null)}
+          onSubmit={(data) => updateMutation.mutate({ id: editingUser.id, data })}
+          submitting={updateMutation.isPending}
+          error={updateMutation.error}
+        />
+      )}
     </div>
   );
 }
@@ -326,31 +468,63 @@ function AddShopUserForm({ onSubmit, submitting, error }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mb-4 flex items-end gap-3 rounded-md bg-gray-50 p-3">
-      {error && <p className="text-sm text-red-600">{error.message}</p>}
+    <form onSubmit={handleSubmit} className="mb-4 flex flex-wrap items-end gap-3 rounded-md bg-gray-50 p-3">
+      {error && <p className="w-full text-sm text-red-600">{error.message}</p>}
       <Field label="Name" value={form.name} onChange={handleChange('name')} required />
       <Field label="Phone" value={form.phone} onChange={handleChange('phone')} required />
-      <label className="block">
-        <span className="mb-1 block text-xs font-medium text-gray-700">Role</span>
-        <select
-          value={form.role}
-          onChange={handleChange('role')}
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-        >
+      <Select label="Role" value={form.role} onChange={handleChange('role')}>
+        {SHOP_USER_ROLES.map((r) => (
+          <option key={r} value={r}>
+            {r}
+          </option>
+        ))}
+      </Select>
+      <button
+        type="submit"
+        disabled={submitting}
+        className="rounded-md bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+      >
+        {submitting ? 'Adding…' : 'Add'}
+      </button>
+    </form>
+  );
+}
+
+function EditShopUserModal({ user, onClose, onSubmit, submitting, error }) {
+  const [form, setForm] = useState({ name: user.name, phone: user.phone, role: user.role });
+
+  function handleChange(field) {
+    return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    onSubmit(form);
+  }
+
+  return (
+    <Modal title="Edit staff member" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {error && (
+          <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error.message}</div>
+        )}
+        <Field label="Name" value={form.name} onChange={handleChange('name')} required />
+        <Field label="Phone" value={form.phone} onChange={handleChange('phone')} required />
+        <Select label="Role" value={form.role} onChange={handleChange('role')}>
           {SHOP_USER_ROLES.map((r) => (
             <option key={r} value={r}>
               {r}
             </option>
           ))}
-        </select>
-      </label>
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
-      >
-        {submitting ? 'Adding…' : 'Add'}
-      </button>
-    </form>
+        </Select>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+        >
+          {submitting ? 'Saving…' : 'Save changes'}
+        </button>
+      </form>
+    </Modal>
   );
 }
