@@ -9,31 +9,31 @@ function buildQuery({ search, page, limit } = {}) {
   return qs ? `?${qs}` : '';
 }
 
-export function listProducts(shopId, opts) {
-  return request(`/api/admin/shops/${shopId}/products${buildQuery(opts)}`);
+export function listItems(shopId, opts) {
+  return request(`/api/admin/shops/${shopId}/items${buildQuery(opts)}`);
 }
 
-export function createProduct(shopId, data) {
-  return request(`/api/admin/shops/${shopId}/products`, { method: 'POST', body: data });
+export function createItem(shopId, data) {
+  return request(`/api/admin/shops/${shopId}/items`, { method: 'POST', body: data });
 }
 
-export function updateProduct(shopId, id, data) {
-  return request(`/api/admin/shops/${shopId}/products/${id}`, { method: 'PATCH', body: data });
+export function updateItem(shopId, id, data) {
+  return request(`/api/admin/shops/${shopId}/items/${id}`, { method: 'PATCH', body: data });
 }
 
-export function deleteProduct(shopId, id) {
-  return request(`/api/admin/shops/${shopId}/products/${id}`, { method: 'DELETE' });
+export function deleteItem(shopId, id) {
+  return request(`/api/admin/shops/${shopId}/items/${id}`, { method: 'DELETE' });
 }
 
-export function uploadProductImage(shopId, id, file) {
+export function uploadItemImage(shopId, id, file) {
   const formData = new FormData();
   formData.append('image', file);
-  return request(`/api/admin/shops/${shopId}/products/${id}/image`, {
+  return request(`/api/admin/shops/${shopId}/items/${id}/image`, {
     method: 'POST',
     body: formData,
   });
 }
 
-export function deleteProductImage(shopId, id) {
-  return request(`/api/admin/shops/${shopId}/products/${id}/image`, { method: 'DELETE' });
+export function deleteItemImage(shopId, id) {
+  return request(`/api/admin/shops/${shopId}/items/${id}/image`, { method: 'DELETE' });
 }

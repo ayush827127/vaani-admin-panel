@@ -10,7 +10,7 @@ import Field from '../components/Field';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import OverviewTab from './shop-tabs/OverviewTab';
-import ProductsTab from './shop-tabs/ProductsTab';
+import ItemsTab from './shop-tabs/ItemsTab';
 import CustomersTab from './shop-tabs/CustomersTab';
 import InvoicesTab from './shop-tabs/InvoicesTab';
 import PaymentsTab from './shop-tabs/PaymentsTab';
@@ -19,7 +19,7 @@ const SHOP_STATUS_OPTIONS = ['TRIAL', 'ACTIVE', 'SUSPENDED', 'CANCELLED'];
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
-  { key: 'products', label: 'Products' },
+  { key: 'items', label: 'Items' },
   { key: 'customers', label: 'Customers' },
   { key: 'invoices', label: 'Invoices' },
   { key: 'payments', label: 'Payments' },
@@ -151,7 +151,7 @@ export default function ShopDetailPage() {
       {activeTab === 'overview' && (
         <OverviewTab shopId={shopId} shop={shop} modules={modulesQuery.data ?? []} />
       )}
-      {activeTab === 'products' && <ProductsTab shopId={shopId} />}
+      {activeTab === 'items' && <ItemsTab shopId={shopId} />}
       {activeTab === 'customers' && <CustomersTab shopId={shopId} />}
       {activeTab === 'invoices' && <InvoicesTab shopId={shopId} />}
       {activeTab === 'payments' && <PaymentsTab shopId={shopId} />}

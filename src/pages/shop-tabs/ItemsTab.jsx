@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as productsApi from '../../api/syncedProducts';
+import * as itemsApi from '../../api/syncedItems';
 import Modal from '../../components/Modal';
 import Field from '../../components/Field';
 import SearchBar from '../../components/SearchBar';
@@ -9,38 +9,38 @@ import { useToast } from '../../components/ToastContext';
 
 const LIMIT = 20;
 
-export default function ProductsTab({ shopId }) {
+export default function ItemsTab({ shopId }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [modalProduct, setModalProduct] = useState(null); // null = closed, {} = create, {...} = edit
+  const [modalItem, setModalItem] = useState(null); // null = closed, {} = create, {...} = edit
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const query = useQuery({
-    queryKey: ['products', shopId, search, page],
-    queryFn: () => productsApi.listProducts(shopId, { search, page, limit: LIMIT }),
+    queryKey: ['items', shopId, search, page],
+    queryFn: () => itemsApi.listItems(shopId, { search, page, limit: LIMIT }),
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['products', shopId] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['items', shopId] });
 
   const saveMutation = useMutation({
     mutationFn: ({ id, data }) =>
-      id ? productsApi.updateProduct(shopId, id, data) : productsApi.createProduct(shopId, data),
+      id ? itemsApi.updateItem(shopId, id, data) : itemsApi.createItem(shopId, data),
     onSuccess: (_, { id }) => {
       invalidate();
-      setModalProduct(null);
-      toast.success(id ? 'Product updated' : 'Product created');
+      setModalItem(null);
+      toast.success(id ? 'Item updated' : 'Item created');
     },
     onError: (err) => toast.error(err.message),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => productsApi.deleteProduct(shopId, id),
+    mutationFn: (id) => itemsApi.deleteItem(shopId, id),
     onSuccess: () => {
       invalidate();
       setConfirmDeleteId(null);
-      toast.success('Product deleted');
+      toast.success('Item deleted');
     },
     onError: (err) => toast.error(err.message),
   });
@@ -57,10 +57,10 @@ export default function ProductsTab({ shopId }) {
           placeholder="Search name, SKU, barcode…"
         />
         <button
-          onClick={() => setModalProduct({})}
+          onClick={() => setModalItem({})}
           className="rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
         >
-          New product
+          New item
         </button>
       </div>
 
@@ -112,7 +112,7 @@ export default function ProductsTab({ shopId }) {
                   </td>
                   <td className="px-4 py-2.5 text-right text-xs">
                     <button
-                      onClick={() => setModalProduct(p)}
+                      onClick={() => setModalItem(p)}
                       className="mr-3 text-purple-700 hover:underline"
                     >
                       Edit
@@ -129,7 +129,7 @@ export default function ProductsTab({ shopId }) {
               {query.data.items.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
-                    No products found.
+                    No items found.
                   </td>
                 </tr>
               )}
@@ -139,12 +139,12 @@ export default function ProductsTab({ shopId }) {
         </div>
       )}
 
-      {modalProduct && (
-        <ProductFormModal
+      {modalItem && (
+        <ItemFormModal
           shopId={shopId}
-          product={modalProduct.id ? modalProduct : null}
-          onClose={() => setModalProduct(null)}
-          onSubmit={(data) => saveMutation.mutate({ id: modalProduct.id, data })}
+          item={modalItem.id ? modalItem : null}
+          onClose={() => setModalItem(null)}
+          onSubmit={(data) => saveMutation.mutate({ id: modalItem.id, data })}
           submitting={saveMutation.isPending}
           error={saveMutation.error}
           onImageChanged={invalidate}
@@ -152,7 +152,7 @@ export default function ProductsTab({ shopId }) {
       )}
 
       {confirmDeleteId && (
-        <Modal title="Delete product?" onClose={() => setConfirmDeleteId(null)}>
+        <Modal title="Delete item?" onClose={() => setConfirmDeleteId(null)}>
           <p className="mb-4 text-sm text-gray-600">
             This will also remove it from the shop's phone the next time it syncs. This cannot
             be undone.
@@ -178,20 +178,20 @@ export default function ProductsTab({ shopId }) {
   );
 }
 
-function ProductFormModal({ shopId, product, onClose, onSubmit, submitting, error, onImageChanged }) {
+function ItemFormModal({ shopId, item, onClose, onSubmit, submitting, error, onImageChanged }) {
   const [form, setForm] = useState({
-    name: product?.name ?? '',
-    sku: product?.sku ?? '',
-    barcode: product?.barcode ?? '',
-    category: product?.category ?? '',
-    costPrice: product?.costPrice ?? 0,
-    sellingPrice: product?.sellingPrice ?? 0,
-    gstRate: product?.gstRate ?? 5,
-    stockQuantity: product?.stockQuantity ?? 0,
-    reorderLevel: product?.reorderLevel ?? 10,
-    isActive: product?.isActive ?? true,
+    name: item?.name ?? '',
+    sku: item?.sku ?? '',
+    barcode: item?.barcode ?? '',
+    category: item?.category ?? '',
+    costPrice: item?.costPrice ?? 0,
+    sellingPrice: item?.sellingPrice ?? 0,
+    gstRate: item?.gstRate ?? 5,
+    stockQuantity: item?.stockQuantity ?? 0,
+    reorderLevel: item?.reorderLevel ?? 10,
+    isActive: item?.isActive ?? true,
   });
-  const [imageUrl, setImageUrl] = useState(product?.imageUrl ?? null);
+  const [imageUrl, setImageUrl] = useState(item?.imageUrl ?? null);
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState(null);
 
@@ -202,11 +202,11 @@ function ProductFormModal({ shopId, product, onClose, onSubmit, submitting, erro
   async function handleImageChange(e) {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file || !product?.id) return;
+    if (!file || !item?.id) return;
     setImageBusy(true);
     setImageError(null);
     try {
-      const updated = await productsApi.uploadProductImage(shopId, product.id, file);
+      const updated = await itemsApi.uploadItemImage(shopId, item.id, file);
       setImageUrl(updated.imageUrl);
       onImageChanged?.();
     } catch (err) {
@@ -217,11 +217,11 @@ function ProductFormModal({ shopId, product, onClose, onSubmit, submitting, erro
   }
 
   async function handleImageRemove() {
-    if (!product?.id) return;
+    if (!item?.id) return;
     setImageBusy(true);
     setImageError(null);
     try {
-      await productsApi.deleteProductImage(shopId, product.id);
+      await itemsApi.deleteItemImage(shopId, item.id);
       setImageUrl(null);
       onImageChanged?.();
     } catch (err) {
@@ -247,12 +247,12 @@ function ProductFormModal({ shopId, product, onClose, onSubmit, submitting, erro
   }
 
   return (
-    <Modal title={product ? 'Edit product' : 'New product'} onClose={onClose}>
+    <Modal title={item ? 'Edit item' : 'New item'} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3">
         {error && (
           <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error.message}</div>
         )}
-        {product && (
+        {item && (
           <div className="flex items-center gap-3">
             {imageUrl ? (
               <img
@@ -345,7 +345,7 @@ function ProductFormModal({ shopId, product, onClose, onSubmit, submitting, erro
           disabled={submitting}
           className="w-full rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
         >
-          {submitting ? 'Saving…' : product ? 'Save changes' : 'Create product'}
+          {submitting ? 'Saving…' : item ? 'Save changes' : 'Create item'}
         </button>
       </form>
     </Modal>

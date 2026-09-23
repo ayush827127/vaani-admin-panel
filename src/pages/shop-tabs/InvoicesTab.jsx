@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as invoicesApi from '../../api/syncedInvoices';
-import * as productsApi from '../../api/syncedProducts';
+import * as itemsApi from '../../api/syncedItems';
 import * as customersApi from '../../api/syncedCustomers';
 import Modal from '../../components/Modal';
 import Field from '../../components/Field';
@@ -192,13 +192,13 @@ export default function InvoicesTab({ shopId }) {
 }
 
 function emptyRow() {
-  return { productId: '', productName: '', quantity: 1, sellingPrice: 0, gstRate: 0 };
+  return { itemId: '', itemName: '', quantity: 1, sellingPrice: 0, gstRate: 0 };
 }
 
 function InvoiceFormModal({ shopId, invoice, onClose, onSubmit, submitting, error }) {
-  const productsQuery = useQuery({
-    queryKey: ['products', shopId, 'all-for-invoice'],
-    queryFn: () => productsApi.listProducts(shopId, { limit: 200 }),
+  const itemsQuery = useQuery({
+    queryKey: ['items', shopId, 'all-for-invoice'],
+    queryFn: () => itemsApi.listItems(shopId, { limit: 200 }),
   });
   const customersQuery = useQuery({
     queryKey: ['customers', shopId, 'all-for-invoice'],
@@ -216,8 +216,8 @@ function InvoiceFormModal({ shopId, invoice, onClose, onSubmit, submitting, erro
   const [rows, setRows] = useState(
     invoice?.items?.length
       ? invoice.items.map((i) => ({
-          productId: i.localProductId,
-          productName: i.productName,
+          itemId: i.localItemId,
+          itemName: i.itemName,
           quantity: i.quantity,
           sellingPrice: i.sellingPrice,
           gstRate: i.gstRate,
@@ -229,13 +229,13 @@ function InvoiceFormModal({ shopId, invoice, onClose, onSubmit, submitting, erro
     setRows((r) => r.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
-  function handleProductSelect(index, productId) {
-    const product = productsQuery.data?.items.find((p) => p.localId === Number(productId));
+  function handleItemSelect(index, itemId) {
+    const item = itemsQuery.data?.items.find((p) => p.localId === Number(itemId));
     updateRow(index, {
-      productId,
-      productName: product?.name ?? '',
-      sellingPrice: product?.sellingPrice ?? 0,
-      gstRate: product?.gstRate ?? 0,
+      itemId,
+      itemName: item?.name ?? '',
+      sellingPrice: item?.sellingPrice ?? 0,
+      gstRate: item?.gstRate ?? 0,
     });
   }
 
@@ -271,10 +271,10 @@ function InvoiceFormModal({ shopId, invoice, onClose, onSubmit, submitting, erro
       discountValue: Number(discountValue || 0),
       receivedAmount: receivedAmount === '' ? grandTotal : Number(receivedAmount),
       items: rows
-        .filter((r) => r.productId)
+        .filter((r) => r.itemId)
         .map((r) => ({
-          productId: Number(r.productId),
-          productName: r.productName,
+          itemId: Number(r.itemId),
+          itemName: r.itemName,
           quantity: Number(r.quantity),
           sellingPrice: Number(r.sellingPrice),
           gstRate: Number(r.gstRate || 0),
@@ -323,12 +323,12 @@ function InvoiceFormModal({ shopId, invoice, onClose, onSubmit, submitting, erro
             {rows.map((row, i) => (
               <div key={i} className="flex items-end gap-2 rounded-md bg-gray-50 p-2">
                 <select
-                  value={row.productId}
-                  onChange={(e) => handleProductSelect(i, e.target.value)}
+                  value={row.itemId}
+                  onChange={(e) => handleItemSelect(i, e.target.value)}
                   className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
                 >
-                  <option value="">Select product…</option>
-                  {productsQuery.data?.items.map((p) => (
+                  <option value="">Select item…</option>
+                  {itemsQuery.data?.items.map((p) => (
                     <option key={p.localId} value={p.localId}>
                       {p.name}
                     </option>
@@ -458,7 +458,7 @@ function InvoiceFormModal({ shopId, invoice, onClose, onSubmit, submitting, erro
 
         <button
           type="submit"
-          disabled={submitting || rows.every((r) => !r.productId)}
+          disabled={submitting || rows.every((r) => !r.itemId)}
           className="w-full rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
         >
           {submitting ? 'Saving…' : invoice ? 'Save changes' : 'Create invoice'}
