@@ -75,17 +75,29 @@ export default function CustomersTab({ shopId }) {
                 <th className="px-4 py-2.5">Name</th>
                 <th className="px-4 py-2.5">Phone</th>
                 <th className="px-4 py-2.5">Total purchases</th>
-                <th className="px-4 py-2.5">Outstanding</th>
+                <th className="px-4 py-2.5">Due / Advance</th>
                 <th className="px-4 py-2.5"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {query.data.items.map((c) => (
+              {query.data.items.map((c) => {
+                // Netted, same rule as the phone app's customer ledger —
+                // totalOutstanding and advanceBalance are two separate
+                // fields and can both be non-zero, but a customer is never
+                // shown owing and being owed at the same time.
+                const net = (c.totalOutstanding ?? 0) - (c.advanceBalance ?? 0);
+                return (
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2.5 font-medium text-gray-900">{c.name}</td>
                   <td className="px-4 py-2.5 text-gray-600">{c.phone ?? '—'}</td>
                   <td className="px-4 py-2.5 text-gray-700">₹{c.totalPurchases}</td>
-                  <td className="px-4 py-2.5 text-gray-700">₹{c.totalOutstanding}</td>
+                  <td className="px-4 py-2.5 text-gray-700">
+                    {Math.abs(net) < 0.005
+                      ? '—'
+                      : net > 0
+                        ? <span className="text-orange-600">₹{net.toFixed(2)} Due</span>
+                        : <span className="text-green-600">₹{Math.abs(net).toFixed(2)} Advance</span>}
+                  </td>
                   <td className="px-4 py-2.5 text-right text-xs">
                     <button
                       onClick={() => setModalCustomer(c)}
@@ -101,7 +113,8 @@ export default function CustomersTab({ shopId }) {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {query.data.items.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
