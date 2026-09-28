@@ -14,6 +14,8 @@ import ItemsTab from './shop-tabs/ItemsTab';
 import CustomersTab from './shop-tabs/CustomersTab';
 import InvoicesTab from './shop-tabs/InvoicesTab';
 import PaymentsTab from './shop-tabs/PaymentsTab';
+import MembersTab from './shop-tabs/MembersTab';
+import AuditLogTab from './shop-tabs/AuditLogTab';
 
 const SHOP_STATUS_OPTIONS = ['TRIAL', 'ACTIVE', 'SUSPENDED', 'CANCELLED'];
 
@@ -23,6 +25,8 @@ const TABS = [
   { key: 'customers', label: 'Customers' },
   { key: 'invoices', label: 'Invoices' },
   { key: 'payments', label: 'Payments' },
+  { key: 'members', label: 'Members' },
+  { key: 'audit-log', label: 'Audit Log' },
 ];
 
 export default function ShopDetailPage() {
@@ -155,6 +159,8 @@ export default function ShopDetailPage() {
       {activeTab === 'customers' && <CustomersTab shopId={shopId} />}
       {activeTab === 'invoices' && <InvoicesTab shopId={shopId} />}
       {activeTab === 'payments' && <PaymentsTab shopId={shopId} />}
+      {activeTab === 'members' && <MembersTab shopId={shopId} />}
+      {activeTab === 'audit-log' && <AuditLogTab shopId={shopId} />}
 
       {showEdit && (
         <EditShopModal
