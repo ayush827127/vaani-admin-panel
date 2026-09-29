@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil } from 'lucide-react';
 import * as modulesApi from '../api/modules';
+import * as plansApi from '../api/plans';
 import Modal from '../components/Modal';
 import Field from '../components/Field';
 import { useToast } from '../components/ToastContext';
@@ -13,6 +14,16 @@ export default function ModulesPage() {
   const [showForm, setShowForm] = useState(false);
 
   const { data, isLoading, error } = useQuery({ queryKey: ['modules'], queryFn: modulesApi.listModules });
+  // Cross-referenced client-side rather than a backend change — plans
+  // already carry their module list (PlansPage uses the same query), so
+  // this just needs to know, per module, which plans include it.
+  const plansQuery = useQuery({ queryKey: ['plans'], queryFn: plansApi.listPlans });
+
+  function plansIncluding(moduleId) {
+    return (plansQuery.data ?? []).filter((plan) =>
+      plan.modules.some((pm) => pm.module.id === moduleId)
+    );
+  }
 
   const saveMutation = useMutation({
     mutationFn: ({ id, data }) => (id ? modulesApi.updateModule(id, data) : modulesApi.createModule(data)),
@@ -64,6 +75,7 @@ export default function ModulesPage() {
                 <th className="px-4 py-2.5">Name</th>
                 <th className="px-4 py-2.5">Key</th>
                 <th className="px-4 py-2.5">Description</th>
+                <th className="px-4 py-2.5">Used in</th>
                 <th className="px-4 py-2.5"></th>
               </tr>
             </thead>
@@ -73,6 +85,30 @@ export default function ModulesPage() {
                   <td className="px-4 py-2.5 font-medium text-gray-900">{m.name}</td>
                   <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{m.key}</td>
                   <td className="px-4 py-2.5 text-gray-600">{m.description || '—'}</td>
+                  <td className="px-4 py-2.5">
+                    {plansQuery.isLoading ? (
+                      <span className="text-xs text-gray-400">…</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {plansIncluding(m.id).map((plan) => (
+                          <span
+                            key={plan.id}
+                            className={`rounded-full px-2 py-0.5 text-xs ${
+                              plan.isActive
+                                ? 'bg-purple-50 text-purple-700'
+                                : 'bg-gray-100 text-gray-400 line-through'
+                            }`}
+                            title={plan.isActive ? undefined : 'Deactivated plan'}
+                          >
+                            {plan.name}
+                          </span>
+                        ))}
+                        {plansIncluding(m.id).length === 0 && (
+                          <span className="text-xs text-gray-400">No plan includes this</span>
+                        )}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-2.5 text-right">
                     <button
                       onClick={() => openEdit(m)}
@@ -85,7 +121,7 @@ export default function ModulesPage() {
               ))}
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                     No modules yet.
                   </td>
                 </tr>
