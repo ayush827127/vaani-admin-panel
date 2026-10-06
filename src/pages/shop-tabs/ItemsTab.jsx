@@ -186,6 +186,7 @@ function ItemFormModal({ shopId, item, onClose, onSubmit, submitting, error, onI
     category: item?.category ?? '',
     costPrice: item?.costPrice ?? 0,
     sellingPrice: item?.sellingPrice ?? 0,
+    mrp: item?.mrp ?? '',
     gstRate: item?.gstRate ?? 5,
     stockQuantity: item?.stockQuantity ?? 0,
     reorderLevel: item?.reorderLevel ?? 10,
@@ -240,6 +241,7 @@ function ItemFormModal({ shopId, item, onClose, onSubmit, submitting, error, onI
       category: form.category || null,
       costPrice: Number(form.costPrice),
       sellingPrice: Number(form.sellingPrice),
+      mrp: form.mrp === '' ? null : Number(form.mrp),
       gstRate: Number(form.gstRate),
       stockQuantity: Number(form.stockQuantity),
       reorderLevel: Number(form.reorderLevel),
@@ -294,7 +296,7 @@ function ItemFormModal({ shopId, item, onClose, onSubmit, submitting, error, onI
           <Field label="SKU" value={form.sku} onChange={handleChange('sku')} />
           <Field label="Category" value={form.category} onChange={handleChange('category')} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <Field
             label="Cost price"
             type="number"
@@ -309,6 +311,13 @@ function ItemFormModal({ shopId, item, onClose, onSubmit, submitting, error, onI
             value={form.sellingPrice}
             onChange={handleChange('sellingPrice')}
             required
+          />
+          <Field
+            label="MRP"
+            type="number"
+            step="0.01"
+            value={form.mrp}
+            onChange={handleChange('mrp')}
           />
         </div>
         <div className="grid grid-cols-3 gap-3">
