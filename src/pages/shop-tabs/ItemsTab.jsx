@@ -187,6 +187,7 @@ function ItemFormModal({ shopId, item, onClose, onSubmit, submitting, error, onI
     costPrice: item?.costPrice ?? 0,
     sellingPrice: item?.sellingPrice ?? 0,
     mrp: item?.mrp ?? '',
+    description: item?.description ?? '',
     gstRate: item?.gstRate ?? 5,
     stockQuantity: item?.stockQuantity ?? 0,
     reorderLevel: item?.reorderLevel ?? 10,
@@ -242,6 +243,7 @@ function ItemFormModal({ shopId, item, onClose, onSubmit, submitting, error, onI
       costPrice: Number(form.costPrice),
       sellingPrice: Number(form.sellingPrice),
       mrp: form.mrp === '' ? null : Number(form.mrp),
+      description: form.description || null,
       gstRate: Number(form.gstRate),
       stockQuantity: Number(form.stockQuantity),
       reorderLevel: Number(form.reorderLevel),
@@ -296,6 +298,15 @@ function ItemFormModal({ shopId, item, onClose, onSubmit, submitting, error, onI
           <Field label="SKU" value={form.sku} onChange={handleChange('sku')} />
           <Field label="Category" value={form.category} onChange={handleChange('category')} />
         </div>
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-gray-700">Description</span>
+          <textarea
+            value={form.description}
+            onChange={handleChange('description')}
+            rows={3}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+          />
+        </label>
         <div className="grid grid-cols-3 gap-3">
           <Field
             label="Cost price"
