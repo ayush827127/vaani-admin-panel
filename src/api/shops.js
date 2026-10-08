@@ -26,6 +26,12 @@ export function setShopStatus(id, status) {
   return request(`/api/admin/shops/${id}/status`, { method: 'PATCH', body: { status } });
 }
 
+// Admin override: clears trialUsed and removes any TRIAL-status
+// subscription row, so the shop can start its 14-day Pro trial again.
+export function resetShopTrial(id) {
+  return request(`/api/admin/shops/${id}/reset-trial`, { method: 'POST' });
+}
+
 export function setModuleOverride(shopId, moduleId, enabled) {
   return request(`/api/admin/shops/${shopId}/modules/${moduleId}`, {
     method: 'PATCH',

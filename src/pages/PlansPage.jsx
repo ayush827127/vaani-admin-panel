@@ -17,6 +17,11 @@ export default function PlansPage() {
   const [editingPlan, setEditingPlan] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [deactivatingPlan, setDeactivatingPlan] = useState(null);
+  const [deletingPlan, setDeletingPlan] = useState(null);
+  // Retired plans (Free, Advanced) stay in the database for billing
+  // history but default to hidden here — otherwise every retired tier
+  // clutters the page forever alongside the two actually-offered plans.
+  const [showInactive, setShowInactive] = useState(false);
 
   const plansQuery = useQuery({ queryKey: ['plans'], queryFn: plansApi.listPlans });
   const modulesQuery = useQuery({ queryKey: ['modules'], queryFn: modulesApi.listModules });
@@ -43,6 +48,18 @@ export default function PlansPage() {
     onError: (err) => toast.error(err.message),
   });
 
+  const deletePermanentlyMutation = useMutation({
+    mutationFn: plansApi.deletePlanPermanently,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['plans'] });
+      toast.success(`${deletingPlan?.name} permanently deleted`);
+      setDeletingPlan(null);
+    },
+    // Most likely a 409 from the backend's reference check — show the
+    // exact count it gives rather than a generic failure.
+    onError: (err) => toast.error(err.message),
+  });
+
   function openCreate() {
     setEditingPlan(null);
     setShowForm(true);
@@ -53,23 +70,38 @@ export default function PlansPage() {
     setShowForm(true);
   }
 
+  const inactiveCount = plansQuery.data?.filter((p) => !p.isActive).length ?? 0;
+  const visiblePlans = plansQuery.data?.filter((p) => showInactive || p.isActive) ?? [];
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Plans</h1>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-1.5 rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
-        >
-          <Plus size={15} />
-          New plan
-        </button>
+        <div className="flex items-center gap-4">
+          {inactiveCount > 0 && (
+            <label className="flex items-center gap-1.5 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+              />
+              Show inactive ({inactiveCount})
+            </label>
+          )}
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-1.5 rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
+          >
+            <Plus size={15} />
+            New plan
+          </button>
+        </div>
       </div>
 
       {plansQuery.isLoading && <p className="text-sm text-gray-500">Loading…</p>}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {plansQuery.data?.map((plan) => (
+        {visiblePlans.map((plan) => (
           <div key={plan.id} className="rounded-lg border border-gray-200 bg-white p-5">
             <div className="mb-2 flex items-start justify-between">
               <div>
@@ -102,12 +134,19 @@ export default function PlansPage() {
               <button onClick={() => openEdit(plan)} className="text-purple-700 hover:underline">
                 Edit
               </button>
-              {plan.isActive && (
+              {plan.isActive ? (
                 <button
                   onClick={() => setDeactivatingPlan(plan)}
                   className="text-red-600 hover:underline"
                 >
                   Deactivate
+                </button>
+              ) : (
+                <button
+                  onClick={() => setDeletingPlan(plan)}
+                  className="text-red-600 hover:underline"
+                >
+                  Delete permanently
                 </button>
               )}
             </div>
@@ -135,6 +174,18 @@ export default function PlansPage() {
           busy={deactivateMutation.isPending}
           onConfirm={() => deactivateMutation.mutate(deactivatingPlan.id)}
           onClose={() => setDeactivatingPlan(null)}
+        />
+      )}
+
+      {deletingPlan && (
+        <ConfirmDialog
+          title="Permanently delete this plan?"
+          message={`${deletingPlan.name} will be removed completely — this cannot be undone. Only possible when no shop's subscription or payment claim still references it; you'll see exactly what's blocking it otherwise.`}
+          confirmLabel="Delete permanently"
+          tone="danger"
+          busy={deletePermanentlyMutation.isPending}
+          onConfirm={() => deletePermanentlyMutation.mutate(deletingPlan.id)}
+          onClose={() => setDeletingPlan(null)}
         />
       )}
     </div>

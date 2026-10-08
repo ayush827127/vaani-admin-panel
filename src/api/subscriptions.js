@@ -11,3 +11,7 @@ export function createSubscription(data) {
 export function updateSubscription(id, data) {
   return request(`/api/admin/subscriptions/${id}`, { method: 'PATCH', body: data });
 }
+
+export function deleteSubscription(id) {
+  return request(`/api/admin/subscriptions/${id}`, { method: 'DELETE' });
+}

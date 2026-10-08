@@ -19,3 +19,9 @@ export function updatePlan(id, data) {
 export function deletePlan(id) {
   return request(`/api/admin/plans/${id}`, { method: 'DELETE' });
 }
+
+// Refused (409) by the backend if any Subscription/PaymentClaim still
+// references this plan — deactivate it instead in that case.
+export function deletePlanPermanently(id) {
+  return request(`/api/admin/plans/${id}/permanent`, { method: 'DELETE' });
+}

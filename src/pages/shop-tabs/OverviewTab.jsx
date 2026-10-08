@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import * as shopsApi from '../../api/shops';
 import * as plansApi from '../../api/plans';
 import * as subscriptionsApi from '../../api/subscriptions';
@@ -9,6 +9,7 @@ import StatusBadge from '../../components/StatusBadge';
 import Field from '../../components/Field';
 import Select from '../../components/Select';
 import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../components/ToastContext';
 
 const SUBSCRIPTION_STATUS_OPTIONS = ['TRIAL', 'ACTIVE', 'EXPIRED', 'CANCELLED'];
@@ -35,6 +36,8 @@ function SubscriptionsSection({ shopId, shop }) {
   const toast = useToast();
   const [showAssign, setShowAssign] = useState(false);
   const [editingSub, setEditingSub] = useState(null);
+  const [deletingSub, setDeletingSub] = useState(null);
+  const [resettingTrial, setResettingTrial] = useState(false);
 
   const subsQuery = useQuery({
     queryKey: ['subscriptions', shopId],
@@ -78,6 +81,29 @@ function SubscriptionsSection({ shopId, shop }) {
     onError: (err) => toast.error(err.message),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: subscriptionsApi.deleteSubscription,
+    onSuccess: () => {
+      invalidate();
+      toast.success('Subscription deleted');
+      setDeletingSub(null);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  // Admin override only — clears trialUsed and removes the TRIAL row(s) so
+  // the shop can start its 14-day Pro trial again. Never reachable by the
+  // shop itself.
+  const resetTrialMutation = useMutation({
+    mutationFn: () => shopsApi.resetShopTrial(shopId),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Trial reset — this shop can start a new 14-day trial');
+      setResettingTrial(false);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-5">
       <div className="mb-3 flex items-center justify-between">
@@ -91,10 +117,18 @@ function SubscriptionsSection({ shopId, shop }) {
         </button>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-4 rounded-md bg-gray-50 p-3 text-xs text-gray-600">
+      <div className="mb-4 flex flex-wrap items-center gap-4 rounded-md bg-gray-50 p-3 text-xs text-gray-600">
         <span>
           Trial used: <span className="font-medium text-gray-900">{shop.trialUsed ? 'Yes' : 'No'}</span>
         </span>
+        {shop.trialUsed && (
+          <button
+            onClick={() => setResettingTrial(true)}
+            className="text-purple-700 hover:underline"
+          >
+            Reset trial
+          </button>
+        )}
         {inForceTrial && (
           <span>
             Current trial: <span className="font-medium text-gray-900">{new Date(inForceTrial.startDate).toLocaleDateString()} – {new Date(inForceTrial.endDate).toLocaleDateString()}</span>
@@ -142,6 +176,13 @@ function SubscriptionsSection({ shopId, shop }) {
               >
                 <Pencil size={13} />
               </button>
+              <button
+                onClick={() => setDeletingSub(sub)}
+                title="Delete subscription"
+                className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+              >
+                <Trash2 size={13} />
+              </button>
             </div>
           </div>
         ))}
@@ -158,6 +199,30 @@ function SubscriptionsSection({ shopId, shop }) {
           onSubmit={(data) => updateMutation.mutate({ id: editingSub.id, data })}
           submitting={updateMutation.isPending}
           error={updateMutation.error}
+        />
+      )}
+
+      {deletingSub && (
+        <ConfirmDialog
+          title="Delete this subscription?"
+          message={`This permanently removes the ${deletingSub.plan.name} subscription row (started ${new Date(deletingSub.startDate).toLocaleDateString()}). This cannot be undone. If this is the shop's current subscription, it falls back to the next most recent one, or Basic if none remain.`}
+          confirmLabel="Delete"
+          tone="danger"
+          busy={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(deletingSub.id)}
+          onClose={() => setDeletingSub(null)}
+        />
+      )}
+
+      {resettingTrial && (
+        <ConfirmDialog
+          title="Reset this shop's trial?"
+          message="This clears the shop's trial-used flag and deletes its TRIAL subscription row(s), letting it start the 14-day Pro trial again. Intended for support/QA — a real shop can never do this itself."
+          confirmLabel="Reset trial"
+          tone="danger"
+          busy={resetTrialMutation.isPending}
+          onConfirm={() => resetTrialMutation.mutate()}
+          onClose={() => setResettingTrial(false)}
         />
       )}
     </div>
