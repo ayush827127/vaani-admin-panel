@@ -46,3 +46,9 @@ export function uploadShopLogo(shopId, file) {
 export function deleteShopLogo(shopId) {
   return request(`/api/admin/shops/${shopId}/logo`, { method: 'DELETE' });
 }
+
+// {used, limit, unlimited} — combined (voice + manual) invoice usage for
+// the current calendar month against the shop's plan.
+export function getShopInvoiceUsage(shopId) {
+  return request(`/api/admin/shops/${shopId}/invoice-usage`);
+}

@@ -17,7 +17,7 @@ const SHOP_USER_ROLES = ['OWNER', 'MANAGER', 'CASHIER'];
 export default function OverviewTab({ shopId, shop, modules }) {
   return (
     <div className="space-y-6">
-      <SubscriptionsSection shopId={shopId} />
+      <SubscriptionsSection shopId={shopId} shop={shop} />
       <ModuleOverridesSection shopId={shopId} modules={modules} overrides={shop.moduleOverrides} />
       <ShopUsersSection shopId={shopId} modules={modules} />
     </div>
@@ -30,7 +30,7 @@ function dateInputValue(d) {
   return d ? new Date(d).toISOString().slice(0, 10) : '';
 }
 
-function SubscriptionsSection({ shopId }) {
+function SubscriptionsSection({ shopId, shop }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [showAssign, setShowAssign] = useState(false);
@@ -41,6 +41,16 @@ function SubscriptionsSection({ shopId }) {
     queryFn: () => subscriptionsApi.listSubscriptionsForShop(shopId),
   });
   const plansQuery = useQuery({ queryKey: ['plans'], queryFn: plansApi.listPlans });
+  const usageQuery = useQuery({
+    queryKey: ['shop-invoice-usage', shopId],
+    queryFn: () => shopsApi.getShopInvoiceUsage(shopId),
+  });
+  // Retired plans (e.g. the old Advanced tier) stay visible everywhere else
+  // for history, but should never be offered for a NEW assignment.
+  const assignablePlans = plansQuery.data?.filter((p) => p.isActive) ?? [];
+  const inForceTrial = subsQuery.data?.find(
+    (sub) => sub.status === 'TRIAL' && (!sub.endDate || new Date(sub.endDate) > new Date())
+  );
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['subscriptions', shopId] });
@@ -81,10 +91,31 @@ function SubscriptionsSection({ shopId }) {
         </button>
       </div>
 
-      {showAssign && plansQuery.data && (
+      <div className="mb-4 flex flex-wrap gap-4 rounded-md bg-gray-50 p-3 text-xs text-gray-600">
+        <span>
+          Trial used: <span className="font-medium text-gray-900">{shop.trialUsed ? 'Yes' : 'No'}</span>
+        </span>
+        {inForceTrial && (
+          <span>
+            Current trial: <span className="font-medium text-gray-900">{new Date(inForceTrial.startDate).toLocaleDateString()} – {new Date(inForceTrial.endDate).toLocaleDateString()}</span>
+          </span>
+        )}
+        <span>
+          Invoices this month:{' '}
+          <span className="font-medium text-gray-900">
+            {usageQuery.data
+              ? usageQuery.data.unlimited
+                ? `${usageQuery.data.used} (unlimited)`
+                : `${usageQuery.data.used} / ${usageQuery.data.limit}`
+              : '…'}
+          </span>
+        </span>
+      </div>
+
+      {showAssign && (
         <AssignSubscriptionForm
           shopId={shopId}
-          plans={plansQuery.data}
+          plans={assignablePlans}
           onSubmit={(data) => createMutation.mutate(data)}
           submitting={createMutation.isPending}
           error={createMutation.error}

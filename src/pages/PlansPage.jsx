@@ -95,9 +95,8 @@ export default function PlansPage() {
               ))}
             </div>
             <div className="mb-4 space-y-0.5 text-xs text-gray-500">
-              <p>Voice invoices: {plan.voiceInvoiceLimit == null ? 'Unlimited' : `${plan.voiceInvoiceLimit} lifetime`}</p>
+              <p>Invoices: {plan.invoiceMonthlyLimit == null ? 'Unlimited' : `${plan.invoiceMonthlyLimit}/month`}</p>
               <p>Staff: {plan.staffLimit == null ? 'Unlimited' : `${plan.staffLimit} additional`}</p>
-              <p>Manual invoices: {plan.manualInvoiceMonthlyLimit == null ? 'Unlimited' : `${plan.manualInvoiceMonthlyLimit}/month`}</p>
             </div>
             <div className="flex gap-3 text-sm">
               <button onClick={() => openEdit(plan)} className="text-purple-700 hover:underline">
@@ -150,12 +149,13 @@ function PlanFormModal({ plan, modules, onClose, onSubmit, submitting, error }) 
   // Empty string = unlimited (sent as null) — distinct from 0, which is a
   // real, meaningful cap (e.g. staffLimit: 0 means no additional staff at
   // all). Defaults to empty/unlimited for a brand-new plan rather than
-  // guessing a number.
-  const [voiceInvoiceLimit, setVoiceInvoiceLimit] = useState(plan?.voiceInvoiceLimit ?? '');
+  // guessing a number. invoiceMonthlyLimit counts voice- and
+  // manually-created invoices TOGETHER against one combined monthly quota
+  // (previously two separate fields — a lifetime voice cap and a monthly
+  // manual cap — now collapsed into this one, matching the simplified
+  // business rule).
+  const [invoiceMonthlyLimit, setInvoiceMonthlyLimit] = useState(plan?.invoiceMonthlyLimit ?? '');
   const [staffLimit, setStaffLimit] = useState(plan?.staffLimit ?? '');
-  const [manualInvoiceMonthlyLimit, setManualInvoiceMonthlyLimit] = useState(
-    plan?.manualInvoiceMonthlyLimit ?? ''
-  );
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -164,9 +164,8 @@ function PlanFormModal({ plan, modules, onClose, onSubmit, submitting, error }) 
       price: Number(price),
       billingCycle,
       moduleIds,
-      voiceInvoiceLimit: voiceInvoiceLimit === '' ? null : Number(voiceInvoiceLimit),
+      invoiceMonthlyLimit: invoiceMonthlyLimit === '' ? null : Number(invoiceMonthlyLimit),
       staffLimit: staffLimit === '' ? null : Number(staffLimit),
-      manualInvoiceMonthlyLimit: manualInvoiceMonthlyLimit === '' ? null : Number(manualInvoiceMonthlyLimit),
     });
   }
 
@@ -207,14 +206,14 @@ function PlanFormModal({ plan, modules, onClose, onSubmit, submitting, error }) 
         <div>
           <span className="mb-1 block text-sm font-medium text-gray-700">Resource limits</span>
           <p className="mb-2 text-xs text-gray-500">Leave a field blank for unlimited.</p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Field
-              label="Voice invoices (lifetime)"
+              label="Invoices / month"
               type="number"
               min="0"
               placeholder="Unlimited"
-              value={voiceInvoiceLimit}
-              onChange={(e) => setVoiceInvoiceLimit(e.target.value)}
+              value={invoiceMonthlyLimit}
+              onChange={(e) => setInvoiceMonthlyLimit(e.target.value)}
             />
             <Field
               label="Staff (additional)"
@@ -223,14 +222,6 @@ function PlanFormModal({ plan, modules, onClose, onSubmit, submitting, error }) 
               placeholder="Unlimited"
               value={staffLimit}
               onChange={(e) => setStaffLimit(e.target.value)}
-            />
-            <Field
-              label="Manual invoices / month"
-              type="number"
-              min="0"
-              placeholder="Unlimited"
-              value={manualInvoiceMonthlyLimit}
-              onChange={(e) => setManualInvoiceMonthlyLimit(e.target.value)}
             />
           </div>
         </div>
